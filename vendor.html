@@ -4,91 +4,126 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vendor Dashboard - OnlineSoko Mbeya</title>
-  
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     * { box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #eef2f5; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 15px; background: #eef2f5; }
     h1 { color: #1b5e20; font-size: 20px; }
-    .container { display: flex; gap: 20px; flex-wrap: wrap; }
-    .panel { background: white; padding: 20px; border-radius: 8px; flex: 1; min-width: 320px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
-    input, button { width: 100%; padding: 10px; margin: 6px 0; border-radius: 4px; border: 1px solid #ccc; }
+    .container { display: flex; gap: 15px; flex-wrap: wrap; }
+    .panel { background: white; padding: 15px; border-radius: 8px; flex: 1; min-width: 300px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
+    input, button, select { width: 100%; padding: 10px; margin: 6px 0; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; }
     button { background: #1b5e20; color: white; border: none; font-weight: bold; cursor: pointer; }
-    .order-card { background: #fff; border-left: 5px solid #2e7d32; padding: 12px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .order-map { height: 180px; width: 100%; border-radius: 6px; margin: 8px 0; border: 1px solid #ccc; }
-    .p-item { background: #f9f9f9; border: 1px solid #eee; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
-    .p-img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
-    .badge-offer { background: #e65100; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+    
+    /* Dashboard Cards */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px; }
+    .stat-card { background: #fff; padding: 12px; border-radius: 8px; border-left: 4px solid #2e7d32; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .stat-card h4 { margin: 0; font-size: 12px; color: #666; }
+    .stat-card p { margin: 5px 0 0 0; font-size: 16px; font-weight: bold; color: #2e7d32; }
+
+    .order-card { background: #fff; border-left: 5px solid #0288d1; padding: 12px; margin-bottom: 12px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+    .p-item { background: #f9f9f9; border: 1px solid #eee; border-radius: 6px; padding: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .p-img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
+    .badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; }
+    .status-Pending { background: #e65100; }
+    .status-Delivered { background: #2e7d32; }
+    .status-Cancelled { background: #c62828; }
   </style>
 </head>
 <body>
 
-  <div style="display: flex; justify-content: space-between; align-items: center;">
-    <h1>🛠️ Admin & Vendor Panel (OnlineSoko Mbeya)</h1>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <h1>🛠️ Admin Panel & Analytics</h1>
     <button onclick="logout()" style="width: auto; background: #c62828; padding: 6px 12px;">Logout</button>
   </div>
   
-  <div id="auth-status" style="color: green; font-weight: bold; margin: 10px 0;">Inahakiki mamlaka ya Admin...</div>
+  <div id="auth-status" style="color: green; font-weight: bold; margin: 10px 0;">Inahakiki mamlaka...</div>
 
-  <div class="container" id="admin-content" style="display: none;">
-    <!-- Inventory Panel -->
-    <div class="panel">
-      <h3>1. Ongeza Bidhaa Mpya</h3>
-      <input type="text" id="p-name" placeholder="Jina la Bidhaa">
-      <input type="number" id="p-price" placeholder="Bei ya Kawaida (TZS)">
-      <input type="number" id="p-offer-price" placeholder="Bei ya Offer (Acha wazi kama hakuna)">
-      <label style="font-size: 12px; font-weight: bold;">Picha ya Bidhaa:</label>
-      <input type="file" id="p-image" accept="image/*">
-      
-      <button id="save-btn" onclick="addProduct()">Hifadhi Bidhaa</button>
-
-      <hr>
-      <h4>Bidhaa Zilizopo Sokoni</h4>
-      <div id="products-list">Inapakia...</div>
+  <div class="container" id="admin-content" style="display: none; flex-direction: column;">
+    
+    <!-- DASHBOARD ANALYTICS -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h4>JUMLA YA MAPATO (SALES)</h4>
+        <p id="total-revenue">TZS 0</p>
+      </div>
+      <div class="stat-card" style="border-color: #c62828;">
+        <h4>MATUMIZI (EXPENSES)</h4>
+        <p id="total-expenses" style="color: #c62828;">TZS 0</p>
+      </div>
+      <div class="stat-card" style="border-color: #0288d1;">
+        <h4>FAIDA SAFI (NET PROFIT)</h4>
+        <p id="net-profit" style="color: #0288d1;">TZS 0</p>
+      </div>
+      <div class="stat-card" style="border-color: #e65100;">
+        <h4>ODA ZINAZOSUBIRI</h4>
+        <p id="pending-count" style="color: #e65100;">0</p>
+      </div>
     </div>
 
-    <!-- Orders Panel -->
-    <div class="panel">
-      <h3>2. Oda Zinazoingia (Live Orders)</h3>
-      <div id="orders-list">Inasubiri oda...</div>
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+      <!-- Inventory & Expenses Panel -->
+      <div class="panel">
+        <h3>1. Ongeza Bidhaa Mpya</h3>
+        <input type="text" id="p-name" placeholder="Jina la Bidhaa">
+        <input type="number" id="p-price" placeholder="Bei ya Kawaida (TZS)">
+        <input type="number" id="p-offer-price" placeholder="Bei ya Offer (Optional)">
+        <label style="font-size: 11px; font-weight: bold;">Picha ya Bidhaa:</label>
+        <input type="file" id="p-image" accept="image/*">
+        <button id="save-btn" onclick="addProduct()">Hifadhi Bidhaa</button>
+
+        <hr>
+        <h3>2. Rekodi Matumizi (Expense)</h3>
+        <input type="text" id="exp-desc" placeholder="Maelezo ya Matumizi (Mfano: Nauli, Bando)">
+        <input type="number" id="exp-amount" placeholder="Kiasi (TZS)">
+        <button style="background: #e65100;" onclick="addExpense()">Hifadhi Matumizi</button>
+
+        <hr>
+        <h4>Bidhaa Zilizopo Sokoni</h4>
+        <div id="products-list">Inapakia...</div>
+      </div>
+
+      <!-- Orders Panel -->
+      <div class="panel">
+        <h3>3. Oda Live na Status Update</h3>
+        <div id="orders-list">Inasubiri oda...</div>
+
+        <hr>
+        <h3>4. History ya Oda (Delivered/Cancelled)</h3>
+        <div id="orders-history">Inapakia history...</div>
+      </div>
     </div>
+
   </div>
 
-  <!-- Leaflet & Firebase SDKs -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <script>
-    // CLOUDINARY SETTINGS
     const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/emakljnw/image/upload";
     const CLOUDINARY_PRESET = "sokoni mbeya";
 
     const firebaseConfig = {
-  apiKey: "AIzaSyBlsEfZZg3N6P40yzDZVzT90xwK-zImd88",
-  authDomain: "foodies-mbeya.firebaseapp.com",
-  databaseURL: "https://foodies-mbeya-default-rtdb.firebaseio.com",
-  projectId: "foodies-mbeya",
-  storageBucket: "foodies-mbeya.firebasestorage.app",
-  messagingSenderId: "1074962803699",
-  appId: "1:1074962803699:web:2cc5432bc5098ce9970086",
-  measurementId: "G-NRN58KSQ49"
-};
+      apiKey: "AIzaSyBlsEfZZg3N6P40yzDZVzT90xwK-zImd88",
+      authDomain: "foodies-mbeya.firebaseapp.com",
+      databaseURL: "https://foodies-mbeya-default-rtdb.firebaseio.com",
+      projectId: "foodies-mbeya",
+      storageBucket: "foodies-mbeya.firebasestorage.app",
+      messagingSenderId: "1074962803699",
+      appId: "1:1074962803699:web:2cc5432bc5098ce9970086",
+      measurementId: "G-NRN58KSQ49"
+    };
 
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const auth = firebase.auth();
 
     const ADMIN_EMAIL = "soko@on.mby";
 
     function logout() {
-      auth.signOut().then(() => { window.location.replace("index.html"); });
+      auth.signOut().then(() => window.location.replace("index.html"));
     }
 
-    // VERIFY ADMIN
     auth.onAuthStateChanged(user => {
       if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
         document.getElementById('auth-status').style.display = 'none';
@@ -101,8 +136,11 @@
       }
     });
 
+    let globalRevenue = 0;
+    let globalExpenses = 0;
+
     function initVendorPanel() {
-      // 1. UPLOAD IMAGE TO CLOUDINARY & SAVE PRODUCT
+      // 1. ADD PRODUCT TO CLOUDINARY & FIREBASE
       window.addProduct = async function() {
         const name = document.getElementById('p-name').value.trim();
         const price = document.getElementById('p-price').value;
@@ -110,17 +148,15 @@
         const fileInput = document.getElementById('p-image');
         const saveBtn = document.getElementById('save-btn');
 
-        if (!name || !price) return alert("Jaza angalau Jina na Bei ya Kawaida!");
+        if (!name || !price) return alert("Jaza angalau Jina na Bei!");
 
         saveBtn.disabled = true;
         saveBtn.textContent = "Inapandisha picha Cloudinary...";
 
         let imageUrl = "";
-
         if (fileInput.files.length > 0) {
-          const file = fileInput.files[0];
           const formData = new FormData();
-          formData.append("file", file);
+          formData.append("file", fileInput.files[0]);
           formData.append("upload_preset", CLOUDINARY_PRESET);
 
           try {
@@ -128,7 +164,7 @@
             const data = await res.json();
             imageUrl = data.secure_url || "";
           } catch (e) {
-            alert("Kosa la ku-upload picha Cloudinary: " + e.message);
+            alert("Kosa Cloudinary: " + e.message);
             saveBtn.disabled = false;
             saveBtn.textContent = "Hifadhi Bidhaa";
             return;
@@ -136,24 +172,37 @@
         }
 
         db.ref('products').push({
-          name: name,
-          price: parseInt(price),
-          offerPrice: offerPrice ? parseInt(offerPrice) : null,
-          imageUrl: imageUrl,
-          updatedAt: new Date().toISOString()
+          name, price: parseInt(price), offerPrice: offerPrice ? parseInt(offerPrice) : null, imageUrl
         }).then(() => {
           document.getElementById('p-name').value = '';
           document.getElementById('p-price').value = '';
           document.getElementById('p-offer-price').value = '';
           fileInput.value = '';
-          alert("Bidhaa imehifadhiwa kikamilifu!");
+          alert("Bidhaa imehifadhiwa!");
         }).finally(() => {
           saveBtn.disabled = false;
           saveBtn.textContent = "Hifadhi Bidhaa";
         });
       };
 
-      // 2. READ PRODUCTS & EDIT/DELETE
+      // 2. ADD EXPENSE
+      window.addExpense = function() {
+        const desc = document.getElementById('exp-desc').value.trim();
+        const amount = document.getElementById('exp-amount').value;
+        if (!desc || !amount) return alert("Jaza maelezo na kiasi!");
+
+        db.ref('expenses').push({
+          description: desc,
+          amount: parseInt(amount),
+          timestamp: new Date().toISOString()
+        }).then(() => {
+          document.getElementById('exp-desc').value = '';
+          document.getElementById('exp-amount').value = '';
+          alert("Matumizi yamehifadhiwa!");
+        });
+      };
+
+      // 3. READ PRODUCTS
       db.ref('products').on('value', snapshot => {
         const list = document.getElementById('products-list');
         list.innerHTML = '';
@@ -162,93 +211,125 @@
 
         for (let id in data) {
           const p = data[id];
-          const imgTag = p.imageUrl ? `<img src="${p.imageUrl}" class="p-img">` : `<div style="width:60px;height:60px;background:#ddd;border-radius:4px;">No Img</div>`;
-          const priceDisplay = p.offerPrice 
-            ? `<strike style="color:#888;">TZS ${p.price.toLocaleString()}</strike> <strong style="color:#e65100;">TZS ${p.offerPrice.toLocaleString()}</strong> <span class="badge-offer">OFFER</span>`
-            : `<strong>TZS ${p.price.toLocaleString()}</strong>`;
-
+          const img = p.imageUrl ? `<img src="${p.imageUrl}" class="p-img">` : '';
           list.innerHTML += `
             <div class="p-item">
-              <div style="display:flex; gap:10px; align-items:center;">
-                ${imgTag}
-                <div style="flex:1;">
-                  <h4 style="margin:0;">${p.name}</h4>
-                  <p style="margin:4px 0; font-size:13px;">${priceDisplay}</p>
+              <div style="display:flex; gap:8px; align-items:center;">
+                ${img}
+                <div>
+                  <strong>${p.name}</strong><br>
+                  <small>TZS ${p.offerPrice ? p.offerPrice.toLocaleString() : p.price.toLocaleString()}</small>
                 </div>
               </div>
-              <div style="display:flex; gap:5px; margin-top:8px;">
-                <button style="background:#0288d1; font-size:12px; padding:4px;" onclick="editProduct('${id}', '${p.name}', ${p.price}, ${p.offerPrice || 'null'})">Edit</button>
-                <button style="background:#c62828; font-size:12px; padding:4px;" onclick="db.ref('products/${id}').remove()">Futa</button>
+              <div>
+                <button style="background:#0288d1; font-size:11px; padding:4px 8px;" onclick="editProduct('${id}', '${p.name}', ${p.price}, ${p.offerPrice || 'null'})">Edit</button>
+                <button style="background:#c62828; font-size:11px; padding:4px 8px;" onclick="db.ref('products/${id}').remove()">Futa</button>
               </div>
             </div>
           `;
         }
       });
 
-      // EDIT FUNCTION
       window.editProduct = function(id, oldName, oldPrice, oldOffer) {
-        const newName = prompt("Badilisha Jina la Bidhaa:", oldName);
+        const newName = prompt("Jina la Bidhaa:", oldName);
         if (!newName) return;
-        const newPrice = prompt("Badilisha Bei ya Kawaida:", oldPrice);
+        const newPrice = prompt("Bei ya Kawaida:", oldPrice);
         if (!newPrice) return;
-        const newOffer = prompt("Badilisha Bei ya Offer (Acha wazi kufuta offer):", oldOffer !== null ? oldOffer : "");
+        const newOffer = prompt("Bei ya Offer (Acha wazi kufuta):", oldOffer !== null ? oldOffer : "");
 
         db.ref('products/' + id).update({
-          name: newName,
-          price: parseInt(newPrice),
-          offerPrice: newOffer ? parseInt(newOffer) : null
-        }).then(() => alert("Bidhaa imesasishwa!"));
+          name: newName, price: parseInt(newPrice), offerPrice: newOffer ? parseInt(newOffer) : null
+        });
       };
 
-      // 3. READ LIVE ORDERS WITH LEAFLET MAP
+      // 4. READ EXPENSES FOR ANALYTICS
+      db.ref('expenses').on('value', snapshot => {
+        globalExpenses = 0;
+        const data = snapshot.val();
+        for (let id in data) globalExpenses += (data[id].amount || 0);
+        updateAnalytics();
+      });
+
+      // 5. READ ORDERS (LIVE & HISTORY)
       db.ref('orders').on('value', snapshot => {
         const list = document.getElementById('orders-list');
+        const historyList = document.getElementById('orders-history');
         list.innerHTML = '';
+        historyList.innerHTML = '';
+
         const orders = snapshot.val();
-        if (!orders) return list.innerHTML = '<p>Hakuna oda mpya.</p>';
+        globalRevenue = 0;
+        let pendingCount = 0;
 
-        let count = 0;
+        if (!orders) {
+          list.innerHTML = '<p>Hakuna oda mpya.</p>';
+          historyList.innerHTML = '<p>Hakuna history ya oda.</p>';
+          updateAnalytics();
+          return;
+        }
+
         for (let id in orders) {
-          count++;
           const o = orders[id];
-          const mapId = `order-map-${count}`;
+          const status = o.status || 'Pending';
+          const mapsUrl = o.mapLocation ? o.mapLocation.googleMapsUrl : '#';
 
-          // Format items list
+          if (status === 'Delivered') globalRevenue += (o.totalPrice || 0);
+          if (status === 'Pending') pendingCount++;
+
           let itemsHtml = "<ul>";
-          if (o.items && o.items.length > 0) {
-            o.items.forEach(i => itemsHtml += `<li>${i.name} - TZS ${i.price.toLocaleString()}</li>`);
-          }
-          if (o.customItems && o.customItems.length > 0) {
-            o.customItems.forEach(ci => itemsHtml += `<li style="color:#0288d1;"><strong>[Maalum]</strong> ${ci.name} - TZS ${ci.price.toLocaleString()}</li>`);
-          }
+          if (o.items) o.items.forEach(i => itemsHtml += `<li>${i.name} - TZS ${i.price.toLocaleString()}</li>`);
+          if (o.customItems) o.customItems.forEach(ci => itemsHtml += `<li style="color:#0288d1;">[Custom] ${ci.name} - TZS ${ci.price.toLocaleString()}</li>`);
           itemsHtml += "</ul>";
 
-          list.innerHTML += `
-            <div class="order-card">
-              <h4 style="margin:0 0 5px 0;">Oda ya: ${o.customerName || 'Mteja'}</h4>
-              <p style="margin:3px 0;"><strong>Simu:</strong> ${o.customerPhone || 'N/A'}</p>
-              <p style="margin:3px 0;"><strong>Jumla Kuu:</strong> TZS ${parseInt(o.totalPrice || 0).toLocaleString()}</p>
-              <div><strong>Vitu Vilivyoagizwa:</strong> ${itemsHtml}</div>
+          const cardHtml = `
+            <div class="order-card" style="border-left-color: ${status === 'Delivered' ? '#2e7d32' : (status === 'Cancelled' ? '#c62828' : '#e65100')}">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong>Mteja: ${o.customerName || 'Mteja'} (${o.customerPhone})</strong>
+                <span class="badge status-${status}">${status}</span>
+              </div>
+              <p style="margin:4px 0;"><strong>Jumla:</strong> TZS ${parseInt(o.totalPrice || 0).toLocaleString()}</p>
+              ${itemsHtml}
               
-              <label><strong>Eneo la Mteja kwenye Ramani:</strong></label>
-              <div id="${mapId}" class="order-map"></div>
-              
-              <a href="${o.mapLocation ? o.mapLocation.googleMapsUrl : '#'}" target="_blank" style="display:block; text-align:center; background:#2e7d32; color:white; padding:8px; border-radius:4px; text-decoration:none; font-weight:bold; margin-top:5px;">
-                📍 Fungua Google Maps
-              </a>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <a href="${mapsUrl}" target="_blank" style="flex:1; text-align:center; background:#0288d1; color:white; padding:6px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:12px;">
+                  📍 Fungua Google Maps
+                </a>
+                <select style="flex:1; margin:0;" onchange="updateOrderStatus('${id}', this.value)">
+                  <option value="">Badili Status</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Delivered">Delivered (Kamilisha)</option>
+                  <option value="Cancelled">Cancelled (Ghailisha)</option>
+                </select>
+              </div>
             </div>
           `;
 
-          // Render Leaflet Map after DOM inserts
-          setTimeout(() => {
-            if (o.mapLocation && o.mapLocation.lat && o.mapLocation.lng) {
-              const m = L.map(mapId).setView([o.mapLocation.lat, o.mapLocation.lng], 14);
-              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-              L.marker([o.mapLocation.lat, o.mapLocation.lng]).addTo(m);
-            }
-          }, 300);
+          if (status === 'Pending') {
+            list.innerHTML += cardHtml;
+          } else {
+            historyList.innerHTML += cardHtml;
+          }
         }
+
+        document.getElementById('pending-count').textContent = pendingCount;
+        updateAnalytics();
       });
+
+      window.updateOrderStatus = function(orderId, newStatus) {
+        if (!newStatus) return;
+        db.ref('orders/' + orderId).update({ status: newStatus })
+          .then(() => alert("Status imebadilishwa kuwa: " + newStatus));
+      };
+
+      function updateAnalytics() {
+        document.getElementById('total-revenue').textContent = `TZS ${globalRevenue.toLocaleString()}`;
+        document.getElementById('total-expenses').textContent = `TZS ${globalExpenses.toLocaleString()}`;
+        
+        const netProfit = globalRevenue - globalExpenses;
+        const profitEl = document.getElementById('net-profit');
+        profitEl.textContent = `TZS ${netProfit.toLocaleString()}`;
+        profitEl.style.color = netProfit >= 0 ? "#0288d1" : "#c62828";
+      }
     }
   </script>
 </body>
