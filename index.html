@@ -27,7 +27,7 @@
     <input type="password" id="password" placeholder="Neno la Siri (Password - herufi 6+)">
 
     <button id="submit-btn" onclick="submitAuth()">Ingia Sasa</button>
-    <div id="loading-status">Inakagua akaunti yako...</div>
+    <div id="loading-status">Inaingia kwenye akaunti...</div>
     <div class="toggle" onclick="toggleMode()" id="toggle-btn">Huna akaunti? Jisajili Hapa</div>
   </div>
 
@@ -37,7 +37,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <script>
-const firebaseConfig = {
+    const firebaseConfig = {
   apiKey: "AIzaSyBlsEfZZg3N6P40yzDZVzT90xwK-zImd88",
   authDomain: "foodies-mbeya.firebaseapp.com",
   databaseURL: "https://foodies-mbeya-default-rtdb.firebaseio.com",
@@ -51,35 +51,28 @@ const firebaseConfig = {
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
     }
-    const db = firebase.database();
     const auth = firebase.auth();
 
+    const ADMIN_EMAIL = "soko@on.mby";
     let isRedirecting = false;
 
-    // FUNCTION YA KUANGALIA KAMA USER NI ADMIN AU MTEJA
-    function redirectBasedOnRole(user) {
+    // Direct Redirect Function (Bila kuhoji Database)
+    function redirectUser(user) {
       if (isRedirecting) return;
       isRedirecting = true;
       document.getElementById('loading-status').style.display = 'block';
 
-      db.ref('admins/' + user.uid).once('value', snapshot => {
-        if (snapshot.exists()) {
-          // Kama UID ipo kwenye node ya admins -> Mpeleke Vendor/Admin Page
-          window.location.replace("vendor.html");
-        } else {
-          // Kama haipo -> Mpeleke Customer Page
-          window.location.replace("user.html");
-        }
-      }).catch(err => {
-        // Kama kuna changamoto ya kuisoma database, mpeleke user.html kama mteja
+      if (user.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        window.location.replace("vendor.html");
+      } else {
         window.location.replace("user.html");
-      });
+      }
     }
 
-    // Angalia kama user tayari ameshaingia
+    // Angalia kama mteja au admin tayari yupo logged in
     auth.onAuthStateChanged(user => {
       if (user) {
-        redirectBasedOnRole(user);
+        redirectUser(user);
       }
     });
 
@@ -93,7 +86,7 @@ const firebaseConfig = {
     }
 
     function submitAuth() {
-      const email = document.getElementById('email').value;
+      const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
 
       if (!email || !password) {
@@ -106,7 +99,7 @@ const firebaseConfig = {
       if (isLogin) {
         auth.signInWithEmailAndPassword(email, password)
           .then((userCredential) => {
-            redirectBasedOnRole(userCredential.user);
+            redirectUser(userCredential.user);
           })
           .catch(err => {
             document.getElementById('loading-status').style.display = 'none';
@@ -116,7 +109,7 @@ const firebaseConfig = {
         auth.createUserWithEmailAndPassword(email, password)
           .then((userCredential) => {
             alert("Usajili umefanikiwa!");
-            redirectBasedOnRole(userCredential.user);
+            redirectUser(userCredential.user);
           })
           .catch(err => {
             document.getElementById('loading-status').style.display = 'none';
