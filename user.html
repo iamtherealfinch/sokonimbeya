@@ -16,7 +16,7 @@
     button { background: #2e7d32; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
     .cart, .tracking-box { background: white; padding: 15px; margin-top: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
     input { width: 100%; padding: 10px; margin: 6px 0; border: 1px solid #ccc; border-radius: 4px; }
-    #map { height: 220px; width: 100%; border-radius: 8px; margin: 10px 0; border: 2px solid #2e7d32; }
+    #map { height: 280px; width: 100%; border-radius: 8px; margin: 10px 0; border: 2px solid #2e7d32; }
     .badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; }
     .status-Pending { background: #e65100; }
     .status-Delivered { background: #2e7d32; }
@@ -67,7 +67,7 @@
     <input type="text" id="customer-name" placeholder="Jina Yako Kamili">
     <input type="text" id="customer-phone" placeholder="Namba ya Simu (07XXXXXXXX)">
     
-    <label><strong>Weka Pin ya Eneo Lako kwenye Ramani:</strong></label>
+    <label><strong>Weka Pin ya Eneo Lako kwenye Ramani ya Satellite (Mbeya Only):</strong></label>
     <div id="map"></div>
     <button type="button" style="background: #0288d1; font-size: 12px; padding: 6px; width: 100%;" onclick="locateUser()">📍 Onyesha Eneo Langu (GPS)</button>
 
@@ -110,20 +110,43 @@
       auth.signOut().then(() => window.location.replace("index.html"));
     }
 
+    // MAPBOX SETTINGS & BOUNDS FOR MBEYA
+    const mapboxAccessToken = 'pk.eyJ1IjoiZmluY2hsZW9uYXJkIiwiYSI6ImNtdXNqbWpybzBsdWkyeHNkbjI4ZWZpN2gifQ.elQjZtJsfEglZTipbJRBNA';
+    const mbeyaBounds = L.latLngBounds(
+      L.latLng(-9.6000, 32.0000),
+      L.latLng(-7.8000, 34.2000)
+    );
+
     let cart = [];
     let customItems = [];
     let selectedLat = -8.9094, selectedLng = 33.4586;
     let map, marker;
 
     window.onload = function() {
-      map = L.map('map').setView([selectedLat, selectedLng], 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+      map = L.map('map', {
+        center: [selectedLat, selectedLng],
+        zoom: 13.5,
+        minZoom: 10,
+        maxBounds: mbeyaBounds,
+        maxBoundsViscosity: 1.0
+      });
+
+      L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/{z}/{x}/{y}?access_token=${mapboxAccessToken}`, {
+        attribution: '© Mapbox',
+        tileSize: 512,
+        zoomOffset: -1,
+        maxZoom: 18
+      }).addTo(map);
+
       marker = L.marker([selectedLat, selectedLng], { draggable: true }).addTo(map);
+      marker.bindPopup("Sogeza marker kuweka eneo la delivery").openPopup();
 
       marker.on('dragend', () => {
-        selectedLat = marker.getLatLng().lat;
-        selectedLng = marker.getLatLng().lng;
+        const pos = marker.getLatLng();
+        selectedLat = pos.lat;
+        selectedLng = pos.lng;
       });
+
       map.on('click', (e) => {
         marker.setLatLng(e.latlng);
         selectedLat = e.latlng.lat;
@@ -134,10 +157,18 @@
     function locateUser() {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(p => {
-          selectedLat = p.coords.latitude;
-          selectedLng = p.coords.longitude;
-          map.setView([selectedLat, selectedLng], 15);
-          marker.setLatLng([selectedLat, selectedLng]);
+          const lat = p.coords.latitude;
+          const lng = p.coords.longitude;
+
+          if (mbeyaBounds.contains([lat, lng])) {
+            selectedLat = lat;
+            selectedLng = lng;
+            map.setView([selectedLat, selectedLng], 16);
+            marker.setLatLng([selectedLat, selectedLng]);
+            marker.bindPopup("Eneo lako la GPS lilipatikana!").openPopup();
+          } else {
+            alert("GPS inaonyesha upo nje ya mipaka ya Mbeya! Tafadhali weka pin kwenye ramani mwenyewe.");
+          }
         });
       }
     }
@@ -244,7 +275,6 @@
         list.innerHTML = '<p style="font-size:13px; color:#888;">Kikapu chako kipo tupu.</p>';
       }
 
-      // Render standard cart items
       cart.forEach((item, index) => {
         const itemTotal = item.unitPrice * item.qty;
         total += itemTotal;
@@ -266,7 +296,6 @@
         `;
       });
 
-      // Render custom items
       customItems.forEach((item, index) => {
         total += item.price;
         itemCount += 1;
