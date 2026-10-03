@@ -10,14 +10,17 @@
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 15px; background: #f4f7f6; }
     header { background: #2e7d32; color: white; padding: 15px; text-align: center; border-radius: 8px; position: relative; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-top: 15px; }
-    .card { background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.08); display: flex; flex-direction: column; justify-content: space-between; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 15px; }
+    .card { background: white; padding: 10px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.08); display: flex; flex-direction: column; justify-content: space-between; }
+    .card img { width: 100%; height: 110px; object-fit: cover; border-radius: 6px; }
     button { background: #2e7d32; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    .cart { background: white; padding: 20px; margin-top: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
-    input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; }
-    
-    /* Live Map CSS Fix */
-    #map { height: 280px; width: 100%; border-radius: 8px; margin: 10px 0; border: 2px solid #2e7d32; }
+    .cart, .tracking-box { background: white; padding: 15px; margin-top: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
+    input { width: 100%; padding: 10px; margin: 6px 0; border: 1px solid #ccc; border-radius: 4px; }
+    #map { height: 220px; width: 100%; border-radius: 8px; margin: 10px 0; border: 2px solid #2e7d32; }
+    .badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; }
+    .status-Pending { background: #e65100; }
+    .status-Delivered { background: #2e7d32; }
+    .status-Cancelled { background: #c62828; }
   </style>
 </head>
 <body>
@@ -27,25 +30,40 @@
     <button style="position: absolute; right: 10px; top: 15px; background: #c62828; font-size: 11px;" onclick="logout()">Logout</button>
   </header>
 
+  <!-- USER ORDERS TRACKING -->
+  <div class="tracking-box">
+    <h3>📦 Hali ya Oda Zako (Order Tracking)</h3>
+    <div id="user-orders-list">Inapakia oda yako...</div>
+  </div>
+
   <h2>Bidhaa Zilizopo Sokoni</h2>
   <div id="products-list" class="grid"><p>Inapakia bidhaa...</p></div>
+
+  <!-- Custom Items Form -->
+  <div class="cart" style="background:#e8f5e9;">
+    <h3>📝 Unataka Kitu Kisichopo Sokoni?</h3>
+    <div style="display:flex; gap:10px;">
+      <input type="text" id="custom-name" placeholder="Mfano: Mchele Kilo 5">
+      <input type="number" id="custom-price" placeholder="Bei (TZS)">
+    </div>
+    <button type="button" style="background:#0288d1; margin-top:5px;" onclick="addCustomItem()">+ Ongeza Kwenye Oda</button>
+  </div>
 
   <div class="cart">
     <h2>Kikapu Chako (<span id="cart-count">0</span>)</h2>
     <ul id="cart-items"></ul>
-    <p><strong>Jumla: TZS <span id="cart-total">0</span></strong></p>
+    <p><strong>Jumla Kuu: TZS <span id="cart-total">0</span></strong></p>
     
     <hr>
     <h3>Usafirishaji (Delivery Mbeya)</h3>
     <input type="text" id="customer-name" placeholder="Jina Yako Kamili">
-    <input type="text" id="customer-phone" placeholder="Namba ya Simu (Mfano: 07XXXXXXXX)">
+    <input type="text" id="customer-phone" placeholder="Namba ya Simu (07XXXXXXXX)">
     
     <label><strong>Weka Pin ya Eneo Lako kwenye Ramani:</strong></label>
     <div id="map"></div>
-    <button type="button" style="background: #0288d1; font-size: 12px; padding: 6px; width: 100%;" onclick="locateUser()">📍 Onyesha Eneo Langu Hivi Sasa (GPS)</button>
-    <input type="text" id="location-coords" readonly placeholder="Coordinates..." style="margin-top: 5px;">
+    <button type="button" style="background: #0288d1; font-size: 12px; padding: 6px; width: 100%;" onclick="locateUser()">📍 Onyesha Eneo Langu (GPS)</button>
 
-    <button style="background: #25D366; font-size: 16px; width: 100%; margin-top: 10px;" onclick="submitOrder()">Tuma Oda Sasa</button>
+    <button style="background: #25D366; font-size: 16px; width: 100%; margin-top: 15px;" onclick="submitOrder()">Tuma Oda Sasa</button>
   </div>
 
   <!-- Leaflet & Firebase SDKs -->
@@ -55,39 +73,38 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <script>
-   const firebaseConfig = {
-  apiKey: "AIzaSyBlsEfZZg3N6P40yzDZVzT90xwK-zImd88",
-  authDomain: "foodies-mbeya.firebaseapp.com",
-  databaseURL: "https://foodies-mbeya-default-rtdb.firebaseio.com",
-  projectId: "foodies-mbeya",
-  storageBucket: "foodies-mbeya.firebasestorage.app",
-  messagingSenderId: "1074962803699",
-  appId: "1:1074962803699:web:2cc5432bc5098ce9970086",
-  measurementId: "G-NRN58KSQ49"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyBlsEfZZg3N6P40yzDZVzT90xwK-zImd88",
+      authDomain: "foodies-mbeya.firebaseapp.com",
+      databaseURL: "https://foodies-mbeya-default-rtdb.firebaseio.com",
+      projectId: "foodies-mbeya",
+      storageBucket: "foodies-mbeya.firebasestorage.app",
+      messagingSenderId: "1074962803699",
+      appId: "1:1074962803699:web:2cc5432bc5098ce9970086",
+      measurementId: "G-NRN58KSQ49"
+    };
 
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const auth = firebase.auth();
 
-    // Mfumo wa ulinzi: Kama hajaingia mpeleke index.html
-    let isRedirecting = false;
+    let currentUser = null;
+
     auth.onAuthStateChanged(user => {
-      if (!user && !isRedirecting) {
-        isRedirecting = true;
-        window.location.replace("index.html");
+      if (!user) window.location.replace("index.html");
+      else {
+        currentUser = user;
+        loadUserOrders();
       }
     });
 
     function logout() {
-      auth.signOut().then(() => { window.location.replace("index.html"); });
+      auth.signOut().then(() => window.location.replace("index.html"));
     }
 
-    // LIVE MAP INITIALIZATION
     let cart = [];
-    let selectedLat = -8.9094, selectedLng = 33.4586; // Mbeya City
+    let customItems = [];
+    let selectedLat = -8.9094, selectedLng = 33.4586;
     let map, marker;
 
     window.onload = function() {
@@ -95,29 +112,55 @@
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
       marker = L.marker([selectedLat, selectedLng], { draggable: true }).addTo(map);
 
-      updateCoords(selectedLat, selectedLng);
-
-      marker.on('dragend', () => updateCoords(marker.getLatLng().lat, marker.getLatLng().lng));
+      marker.on('dragend', () => {
+        selectedLat = marker.getLatLng().lat;
+        selectedLng = marker.getLatLng().lng;
+      });
       map.on('click', (e) => {
         marker.setLatLng(e.latlng);
-        updateCoords(e.latlng.lat, e.latlng.lng);
+        selectedLat = e.latlng.lat;
+        selectedLng = e.latlng.lng;
       });
-      setTimeout(() => map.invalidateSize(), 400);
     };
 
     function locateUser() {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(p => {
-          map.setView([p.coords.latitude, p.coords.longitude], 15);
-          marker.setLatLng([p.coords.latitude, p.coords.longitude]);
-          updateCoords(p.coords.latitude, p.coords.longitude);
+          selectedLat = p.coords.latitude;
+          selectedLng = p.coords.longitude;
+          map.setView([selectedLat, selectedLng], 15);
+          marker.setLatLng([selectedLat, selectedLng]);
         });
       }
     }
 
-    function updateCoords(lat, lng) {
-      selectedLat = lat; selectedLng = lng;
-      document.getElementById('location-coords').value = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+    // TRACK USER ORDERS LIVE
+    function loadUserOrders() {
+      db.ref('orders').on('value', snapshot => {
+        const list = document.getElementById('user-orders-list');
+        list.innerHTML = '';
+        const orders = snapshot.val();
+        let myOrdersCount = 0;
+
+        for (let id in orders) {
+          if (orders[id].userId === currentUser.uid) {
+            myOrdersCount++;
+            const o = orders[id];
+            const status = o.status || 'Pending';
+            list.innerHTML += `
+              <div style="background:#f9f9f9; padding:8px; border-radius:4px; margin-bottom:6px; border-left:4px solid #2e7d32;">
+                <div style="display:flex; justify-content:space-between;">
+                  <strong>Oda TZS ${o.totalPrice.toLocaleString()}</strong>
+                  <span class="badge status-${status}">${status}</span>
+                </div>
+                <small style="color:#666;">Tarehe: ${new Date(o.timestamp).toLocaleDateString()}</small>
+              </div>
+            `;
+          }
+        }
+
+        if (myOrdersCount === 0) list.innerHTML = '<p style="font-size:13px; color:#666;">Hujatuma oda yoyote bado.</p>';
+      });
     }
 
     // READ PRODUCTS
@@ -125,14 +168,19 @@
       const list = document.getElementById('products-list');
       list.innerHTML = '';
       const data = snapshot.val();
-      if (!data) return list.innerHTML = '<p>Hakuna bidhaa sokoni kwa sasa.</p>';
+      if (!data) return list.innerHTML = '<p>Hakuna bidhaa kwa sasa.</p>';
 
       for (let id in data) {
+        const p = data[id];
+        const finalPrice = p.offerPrice ? p.offerPrice : p.price;
+        const imgTag = p.imageUrl ? `<img src="${p.imageUrl}">` : `<div style="height:100px;background:#eee;border-radius:4px;">No Img</div>`;
+
         list.innerHTML += `
           <div class="card">
-            <h4>${data[id].name}</h4>
-            <p style="color:#e65100; font-weight:bold;">TZS ${parseInt(data[id].price).toLocaleString()}</p>
-            <button onclick="addToCart('${data[id].name}', ${data[id].price})">Weka Kikapuni</button>
+            ${imgTag}
+            <h4 style="margin:6px 0;">${p.name}</h4>
+            <p style="margin:4px 0; color:#2e7d32;"><strong>TZS ${finalPrice.toLocaleString()}</strong></p>
+            <button onclick="addToCart('${p.name}', ${finalPrice})">Kikapuni</button>
           </div>
         `;
       }
@@ -140,30 +188,68 @@
 
     function addToCart(name, price) {
       cart.push({ name, price });
-      document.getElementById('cart-count').textContent = cart.length;
-      let total = cart.reduce((s, i) => s + i.price, 0);
+      renderCart();
+    }
+
+    function addCustomItem() {
+      const name = document.getElementById('custom-name').value.trim();
+      const price = document.getElementById('custom-price').value;
+      if (!name || !price) return alert("Weka jina na bei!");
+
+      customItems.push({ name, price: parseInt(price) });
+      document.getElementById('custom-name').value = '';
+      document.getElementById('custom-price').value = '';
+      renderCart();
+    }
+
+    function renderCart() {
+      const list = document.getElementById('cart-items');
+      list.innerHTML = '';
+      let total = 0;
+
+      cart.forEach(item => {
+        total += item.price;
+        list.innerHTML += `<li>${item.name} - TZS ${item.price.toLocaleString()}</li>`;
+      });
+
+      customItems.forEach(item => {
+        total += item.price;
+        list.innerHTML += `<li style="color:#0288d1;"><strong>[Custom]</strong> ${item.name} - TZS ${item.price.toLocaleString()}</li>`;
+      });
+
+      document.getElementById('cart-count').textContent = cart.length + customItems.length;
       document.getElementById('cart-total').textContent = total.toLocaleString();
     }
 
     function submitOrder() {
       const name = document.getElementById('customer-name').value;
       const phone = document.getElementById('customer-phone').value;
-      if (!name || !phone || cart.length === 0) return alert("Jaza jina, simu na weka bidhaa kikapuni!");
+      if (!name || !phone) return alert("Jaza Jina na Simu!");
+      if (cart.length === 0 && customItems.length === 0) return alert("Weka kitu kikapuni!");
 
-      let total = cart.reduce((s, i) => s + i.price, 0);
+      let total = 0;
+      cart.forEach(i => total += i.price);
+      customItems.forEach(ci => total += ci.price);
+
       db.ref('orders').push({
+        userId: currentUser.uid,
         customerName: name,
         customerPhone: phone,
-        mapLocation: { googleMapsUrl: `https://www.google.com/maps?q=${selectedLat},${selectedLng}` },
         items: cart,
+        customItems: customItems,
         totalPrice: total,
         status: "Pending",
+        mapLocation: {
+          lat: selectedLat,
+          lng: selectedLng,
+          googleMapsUrl: `https://www.google.com/maps?q=${selectedLat},${selectedLng}`
+        },
         timestamp: new Date().toISOString()
       }).then(() => {
         alert("Oda yako imetumwa kikamilifu!");
         cart = [];
-        document.getElementById('cart-count').textContent = 0;
-        document.getElementById('cart-total').textContent = 0;
+        customItems = [];
+        renderCart();
       });
     }
   </script>
