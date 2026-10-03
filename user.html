@@ -21,6 +21,11 @@
     .status-Pending { background: #e65100; }
     .status-Delivered { background: #2e7d32; }
     .status-Cancelled { background: #c62828; }
+
+    /* Cart Editor Styling */
+    .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #f9f9f9; border-radius: 6px; margin-bottom: 6px; border: 1px solid #eee; }
+    .qty-btn { background: #0288d1; color: white; padding: 2px 8px; border-radius: 3px; font-size: 14px; margin: 0 4px; border: none; cursor: pointer; }
+    .del-btn { background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px; border: none; cursor: pointer; margin-left: 6px; }
   </style>
 </head>
 <body>
@@ -51,8 +56,11 @@
 
   <div class="cart">
     <h2>Kikapu Chako (<span id="cart-count">0</span>)</h2>
-    <ul id="cart-items"></ul>
-    <p><strong>Jumla Kuu: TZS <span id="cart-total">0</span></strong></p>
+    
+    <!-- Edit Cart Area -->
+    <div id="cart-items"></div>
+    
+    <p style="font-size: 18px; margin-top: 15px;"><strong>Jumla Kuu: TZS <span id="cart-total">0</span></strong></p>
     
     <hr>
     <h3>Usafirishaji (Delivery Mbeya)</h3>
@@ -134,7 +142,6 @@
       }
     }
 
-    // TRACK USER ORDERS LIVE
     function loadUserOrders() {
       db.ref('orders').on('value', snapshot => {
         const list = document.getElementById('user-orders-list');
@@ -186,8 +193,14 @@
       }
     });
 
-    function addToCart(name, price) {
-      cart.push({ name, price });
+    // ADD TO CART WITH QUANTITY
+    function addToCart(name, unitPrice) {
+      const existing = cart.find(i => i.name === name);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        cart.push({ name, unitPrice, qty: 1 });
+      }
       renderCart();
     }
 
@@ -202,40 +215,98 @@
       renderCart();
     }
 
+    // CART EDITING FUNCTIONS
+    window.changeQty = function(index, delta) {
+      cart[index].qty += delta;
+      if (cart[index].qty <= 0) {
+        cart.splice(index, 1);
+      }
+      renderCart();
+    };
+
+    window.removeFromCart = function(index) {
+      cart.splice(index, 1);
+      renderCart();
+    };
+
+    window.removeCustomItem = function(index) {
+      customItems.splice(index, 1);
+      renderCart();
+    };
+
     function renderCart() {
       const list = document.getElementById('cart-items');
       list.innerHTML = '';
       let total = 0;
+      let itemCount = 0;
 
-      cart.forEach(item => {
-        total += item.price;
-        list.innerHTML += `<li>${item.name} - TZS ${item.price.toLocaleString()}</li>`;
+      if (cart.length === 0 && customItems.length === 0) {
+        list.innerHTML = '<p style="font-size:13px; color:#888;">Kikapu chako kipo tupu.</p>';
+      }
+
+      // Render standard cart items
+      cart.forEach((item, index) => {
+        const itemTotal = item.unitPrice * item.qty;
+        total += itemTotal;
+        itemCount += item.qty;
+
+        list.innerHTML += `
+          <div class="cart-item">
+            <div>
+              <strong>${item.name}</strong><br>
+              <small>TZS ${item.unitPrice.toLocaleString()} × ${item.qty} = TZS ${itemTotal.toLocaleString()}</small>
+            </div>
+            <div>
+              <button class="qty-btn" onclick="changeQty(${index}, -1)">-</button>
+              <span style="font-weight:bold; font-size:14px;">${item.qty}</span>
+              <button class="qty-btn" onclick="changeQty(${index}, 1)">+</button>
+              <button class="del-btn" onclick="removeFromCart(${index})">Futa</button>
+            </div>
+          </div>
+        `;
       });
 
-      customItems.forEach(item => {
+      // Render custom items
+      customItems.forEach((item, index) => {
         total += item.price;
-        list.innerHTML += `<li style="color:#0288d1;"><strong>[Custom]</strong> ${item.name} - TZS ${item.price.toLocaleString()}</li>`;
+        itemCount += 1;
+
+        list.innerHTML += `
+          <div class="cart-item" style="border-left:3px solid #0288d1;">
+            <div>
+              <strong style="color:#0288d1;">[Custom] ${item.name}</strong><br>
+              <small>TZS ${item.price.toLocaleString()}</small>
+            </div>
+            <div>
+              <button class="del-btn" onclick="removeCustomItem(${index})">Futa</button>
+            </div>
+          </div>
+        `;
       });
 
-      document.getElementById('cart-count').textContent = cart.length + customItems.length;
+      document.getElementById('cart-count').textContent = itemCount;
       document.getElementById('cart-total').textContent = total.toLocaleString();
     }
 
     function submitOrder() {
-      const name = document.getElementById('customer-name').value;
-      const phone = document.getElementById('customer-phone').value;
+      const name = document.getElementById('customer-name').value.trim();
+      const phone = document.getElementById('customer-phone').value.trim();
       if (!name || !phone) return alert("Jaza Jina na Simu!");
       if (cart.length === 0 && customItems.length === 0) return alert("Weka kitu kikapuni!");
 
       let total = 0;
-      cart.forEach(i => total += i.price);
+      const formattedItems = cart.map(i => {
+        total += i.unitPrice * i.qty;
+        return { name: `${i.name} (x${i.qty})`, price: i.unitPrice * i.qty };
+      });
+
       customItems.forEach(ci => total += ci.price);
 
       db.ref('orders').push({
         userId: currentUser.uid,
         customerName: name,
         customerPhone: phone,
-        items: cart,
+        items: formattedItems,
         customItems: customItems,
         totalPrice: total,
         status: "Pending",
