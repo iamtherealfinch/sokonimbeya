@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vendor Dashboard - OnlineSoko Mbeya</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #eef2f5; }
+    h1 { color: #1b5e20; font-size: 20px; }
+    .container { display: flex; gap: 20px; flex-wrap: wrap; }
+    .panel { background: white; padding: 20px; border-radius: 8px; flex: 1; min-width: 300px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
+    input, button { width: 100%; padding: 10px; margin: 8px 0; border-radius: 4px; border: 1px solid #ccc; }
+    button { background: #1b5e20; color: white; border: none; font-weight: bold; cursor: pointer; }
+    .order-card { background: #fff; border-left: 5px solid #e65100; padding: 12px; margin-bottom: 12px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <h1>🛠️️ Vendor & Admin Panel</h1>
+    <button onclick="logout()" style="width: auto; background: #c62828; padding: 6px 12px;">Logout</button>
+  </div>
+  
+  <div id="auth-status" style="color: red; font-weight: bold; margin: 10px 0;">Inahakiki mamlaka ya Admin...</div>
+
+  <div class="container" id="admin-content" style="display: none;">
+    <!-- Inventory Panel -->
+    <div class="panel">
+      <h3>1. Ongeza Bidhaa</h3>
+      <input type="text" id="p-name" placeholder="Jina la Bidhaa">
+      <input type="number" id="p-price" placeholder="Bei (TZS)">
+      <button onclick="addProduct()">Hifadhi Bidhaa</button>
+
+      <h4>Bidhaa Zilizopo Sokoni</h4>
+      <div id="products-list">Inapakia...</div>
+    </div>
+
+    <!-- Orders Panel -->
+    <div class="panel">
+      <h3>2. Oda Zinazoingia (Live Orders)</h3>
+      <div id="orders-list">Inasubiri oda...</div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+  const firebaseConfig = {
+  apiKey: "AIzaSyBlsEfZZg3N6P40yzDZVzT90xwK-zImd88",
+  authDomain: "foodies-mbeya.firebaseapp.com",
+  databaseURL: "https://foodies-mbeya-default-rtdb.firebaseio.com",
+  projectId: "foodies-mbeya",
+  storageBucket: "foodies-mbeya.firebasestorage.app",
+  messagingSenderId: "1074962803699",
+  appId: "1:1074962803699:web:2cc5432bc5098ce9970086",
+  measurementId: "G-NRN58KSQ49"
+};
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+    const auth = firebase.auth();
+
+    function logout() {
+      auth.signOut().then(() => { window.location.replace("index.html"); });
+    }
+
+    // VERIFY ADMIN STATUS
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        db.ref('admins/' + user.uid).once('value', snapshot => {
+          if (snapshot.exists()) {
+            document.getElementById('auth-status').style.display = 'none';
+            document.getElementById('admin-content').style.display = 'flex';
+            initVendorPanel();
+          } else {
+            document.getElementById('auth-status').textContent = "Huna Mamlaka! Akaunti hii sio ya Admin.";
+          }
+        });
+      } else {
+        window.location.replace("index.html");
+      }
+    });
+
+    function initVendorPanel() {
+      window.addProduct = function() {
+        const name = document.getElementById('p-name').value;
+        const price = document.getElementById('p-price').value;
+        if (!name || !price) return alert("Jaza vyote!");
+
+        db.ref('products').push({ name, price: parseInt(price) }).then(() => {
+          document.getElementById('p-name').value = '';
+          document.getElementById('p-price').value = '';
+        });
+      };
+
+      db.ref('products').on('value', snapshot => {
+        const list = document.getElementById('products-list');
+        list.innerHTML = '';
+        const data = snapshot.val();
+        for (let id in data) {
+          list.innerHTML += `
+            <div style="display:flex; justify-content:space-between; margin:5px 0;">
+              <span>${data[id].name} - TZS ${parseInt(data[id].price).toLocaleString()}</span>
+              <button style="width:auto; background:red; padding:2px 6px;" onclick="db.ref('products/${id}').remove()">Futa</button>
+            </div>
+          `;
+        }
+      });
+
+      db.ref('orders').on('value', snapshot => {
+        const list = document.getElementById('orders-list');
+        list.innerHTML = '';
+        const orders = snapshot.val();
+        if (!orders) return list.innerHTML = '<p>Hakuna oda kwa sasa.</p>';
+
+        for (let id in orders) {
+          const o = orders[id];
+          const url = o.mapLocation ? o.mapLocation.googleMapsUrl : '#';
+          list.innerHTML += `
+            <div class="order-card">
+              <strong>Mteja:</strong> ${o.customerName} (${o.customerPhone})<br>
+              <strong>Jumla:</strong> TZS ${parseInt(o.totalPrice).toLocaleString()}<br>
+              <a href="${url}" target="_blank" style="color:#0288d1; font-weight:bold;">📍 Fungua Eneo Google Maps</a>
+            </div>
+          `;
+        }
+      });
+    }
+  </script>
+</body>
+</html>

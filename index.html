@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kuingia & Kusajili - OnlineSoko Mbeya</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
+    .card { background: white; padding: 25px; border-radius: 8px; width: 100%; max-width: 360px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    h1 { color: #2e7d32; font-size: 22px; margin-bottom: 5px; }
+    input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
+    button { width: 100%; padding: 12px; background: #2e7d32; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 15px; margin-top: 10px; }
+    button:hover { background: #1b5e20; }
+    .toggle { margin-top: 15px; font-size: 13px; color: #0288d1; cursor: pointer; display: inline-block; }
+    #loading-status { font-size: 13px; color: #2e7d32; font-weight: bold; margin-top: 10px; display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>🛒 OnlineSoko Mbeya</h1>
+    <p style="font-size: 13px; color: #666;">Soko la Mwanjelwa & Soweto Mkononi</p>
+
+    <h3 id="form-title">Ingia Kwenye Akaunti</h3>
+    <input type="email" id="email" placeholder="Barua Pepe (Email)">
+    <input type="password" id="password" placeholder="Neno la Siri (Password - herufi 6+)">
+
+    <button id="submit-btn" onclick="submitAuth()">Ingia Sasa</button>
+    <div id="loading-status">Inakagua akaunti yako...</div>
+    <div class="toggle" onclick="toggleMode()" id="toggle-btn">Huna akaunti? Jisajili Hapa</div>
+  </div>
+
+  <!-- Firebase Core SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBlsEfZZg3N6P40yzDZVzT90xwK-zImd88",
+  authDomain: "foodies-mbeya.firebaseapp.com",
+  databaseURL: "https://foodies-mbeya-default-rtdb.firebaseio.com",
+  projectId: "foodies-mbeya",
+  storageBucket: "foodies-mbeya.firebasestorage.app",
+  messagingSenderId: "1074962803699",
+  appId: "1:1074962803699:web:2cc5432bc5098ce9970086",
+  measurementId: "G-NRN58KSQ49"
+};
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+    const auth = firebase.auth();
+
+    let isRedirecting = false;
+
+    // FUNCTION YA KUANGALIA KAMA USER NI ADMIN AU MTEJA
+    function redirectBasedOnRole(user) {
+      if (isRedirecting) return;
+      isRedirecting = true;
+      document.getElementById('loading-status').style.display = 'block';
+
+      db.ref('admins/' + user.uid).once('value', snapshot => {
+        if (snapshot.exists()) {
+          // Kama UID ipo kwenye node ya admins -> Mpeleke Vendor/Admin Page
+          window.location.replace("vendor.html");
+        } else {
+          // Kama haipo -> Mpeleke Customer Page
+          window.location.replace("user.html");
+        }
+      }).catch(err => {
+        // Kama kuna changamoto ya kuisoma database, mpeleke user.html kama mteja
+        window.location.replace("user.html");
+      });
+    }
+
+    // Angalia kama user tayari ameshaingia
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        redirectBasedOnRole(user);
+      }
+    });
+
+    let isLogin = true;
+
+    function toggleMode() {
+      isLogin = !isLogin;
+      document.getElementById('form-title').textContent = isLogin ? "Ingia Kwenye Akaunti" : "Tengeneza Akaunti Mpya";
+      document.getElementById('submit-btn').textContent = isLogin ? "Ingia Sasa" : "Kamilisha Usajili";
+      document.getElementById('toggle-btn').textContent = isLogin ? "Huna akaunti? Jisajili Hapa" : "Ushakuwa na Akaunti? Ingia Hapa";
+    }
+
+    function submitAuth() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      if (!email || !password) {
+        alert("Tafadhali jaza Barua Pepe na Neno la Siri!");
+        return;
+      }
+
+      document.getElementById('loading-status').style.display = 'block';
+
+      if (isLogin) {
+        auth.signInWithEmailAndPassword(email, password)
+          .then((userCredential) => {
+            redirectBasedOnRole(userCredential.user);
+          })
+          .catch(err => {
+            document.getElementById('loading-status').style.display = 'none';
+            alert("Kosa la Log In: " + err.message);
+          });
+      } else {
+        auth.createUserWithEmailAndPassword(email, password)
+          .then((userCredential) => {
+            alert("Usajili umefanikiwa!");
+            redirectBasedOnRole(userCredential.user);
+          })
+          .catch(err => {
+            document.getElementById('loading-status').style.display = 'none';
+            alert("Kosa la Usajili: " + err.message);
+          });
+      }
+    }
+  </script>
+</body>
+</html>

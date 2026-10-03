@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnlineSoko Mbeya - Soko Mkononi</title>
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 15px; background: #f4f7f6; }
+    header { background: #2e7d32; color: white; padding: 15px; text-align: center; border-radius: 8px; position: relative; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-top: 15px; }
+    .card { background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.08); display: flex; flex-direction: column; justify-content: space-between; }
+    button { background: #2e7d32; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .cart { background: white; padding: 20px; margin-top: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
+    input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; }
+    
+    /* Live Map CSS Fix */
+    #map { height: 280px; width: 100%; border-radius: 8px; margin: 10px 0; border: 2px solid #2e7d32; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🛒 OnlineSoko Mbeya</h1>
+    <button style="position: absolute; right: 10px; top: 15px; background: #c62828; font-size: 11px;" onclick="logout()">Logout</button>
+  </header>
+
+  <h2>Bidhaa Zilizopo Sokoni</h2>
+  <div id="products-list" class="grid"><p>Inapakia bidhaa...</p></div>
+
+  <div class="cart">
+    <h2>Kikapu Chako (<span id="cart-count">0</span>)</h2>
+    <ul id="cart-items"></ul>
+    <p><strong>Jumla: TZS <span id="cart-total">0</span></strong></p>
+    
+    <hr>
+    <h3>Usafirishaji (Delivery Mbeya)</h3>
+    <input type="text" id="customer-name" placeholder="Jina Yako Kamili">
+    <input type="text" id="customer-phone" placeholder="Namba ya Simu (Mfano: 07XXXXXXXX)">
+    
+    <label><strong>Weka Pin ya Eneo Lako kwenye Ramani:</strong></label>
+    <div id="map"></div>
+    <button type="button" style="background: #0288d1; font-size: 12px; padding: 6px; width: 100%;" onclick="locateUser()">📍 Onyesha Eneo Langu Hivi Sasa (GPS)</button>
+    <input type="text" id="location-coords" readonly placeholder="Coordinates..." style="margin-top: 5px;">
+
+    <button style="background: #25D366; font-size: 16px; width: 100%; margin-top: 10px;" onclick="submitOrder()">Tuma Oda Sasa</button>
+  </div>
+
+  <!-- Leaflet & Firebase SDKs -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+   const firebaseConfig = {
+  apiKey: "AIzaSyBlsEfZZg3N6P40yzDZVzT90xwK-zImd88",
+  authDomain: "foodies-mbeya.firebaseapp.com",
+  databaseURL: "https://foodies-mbeya-default-rtdb.firebaseio.com",
+  projectId: "foodies-mbeya",
+  storageBucket: "foodies-mbeya.firebasestorage.app",
+  messagingSenderId: "1074962803699",
+  appId: "1:1074962803699:web:2cc5432bc5098ce9970086",
+  measurementId: "G-NRN58KSQ49"
+};
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+    const auth = firebase.auth();
+
+    // Mfumo wa ulinzi: Kama hajaingia mpeleke index.html
+    let isRedirecting = false;
+    auth.onAuthStateChanged(user => {
+      if (!user && !isRedirecting) {
+        isRedirecting = true;
+        window.location.replace("index.html");
+      }
+    });
+
+    function logout() {
+      auth.signOut().then(() => { window.location.replace("index.html"); });
+    }
+
+    // LIVE MAP INITIALIZATION
+    let cart = [];
+    let selectedLat = -8.9094, selectedLng = 33.4586; // Mbeya City
+    let map, marker;
+
+    window.onload = function() {
+      map = L.map('map').setView([selectedLat, selectedLng], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+      marker = L.marker([selectedLat, selectedLng], { draggable: true }).addTo(map);
+
+      updateCoords(selectedLat, selectedLng);
+
+      marker.on('dragend', () => updateCoords(marker.getLatLng().lat, marker.getLatLng().lng));
+      map.on('click', (e) => {
+        marker.setLatLng(e.latlng);
+        updateCoords(e.latlng.lat, e.latlng.lng);
+      });
+      setTimeout(() => map.invalidateSize(), 400);
+    };
+
+    function locateUser() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(p => {
+          map.setView([p.coords.latitude, p.coords.longitude], 15);
+          marker.setLatLng([p.coords.latitude, p.coords.longitude]);
+          updateCoords(p.coords.latitude, p.coords.longitude);
+        });
+      }
+    }
+
+    function updateCoords(lat, lng) {
+      selectedLat = lat; selectedLng = lng;
+      document.getElementById('location-coords').value = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+    }
+
+    // READ PRODUCTS
+    db.ref('products').on('value', snapshot => {
+      const list = document.getElementById('products-list');
+      list.innerHTML = '';
+      const data = snapshot.val();
+      if (!data) return list.innerHTML = '<p>Hakuna bidhaa sokoni kwa sasa.</p>';
+
+      for (let id in data) {
+        list.innerHTML += `
+          <div class="card">
+            <h4>${data[id].name}</h4>
+            <p style="color:#e65100; font-weight:bold;">TZS ${parseInt(data[id].price).toLocaleString()}</p>
+            <button onclick="addToCart('${data[id].name}', ${data[id].price})">Weka Kikapuni</button>
+          </div>
+        `;
+      }
+    });
+
+    function addToCart(name, price) {
+      cart.push({ name, price });
+      document.getElementById('cart-count').textContent = cart.length;
+      let total = cart.reduce((s, i) => s + i.price, 0);
+      document.getElementById('cart-total').textContent = total.toLocaleString();
+    }
+
+    function submitOrder() {
+      const name = document.getElementById('customer-name').value;
+      const phone = document.getElementById('customer-phone').value;
+      if (!name || !phone || cart.length === 0) return alert("Jaza jina, simu na weka bidhaa kikapuni!");
+
+      let total = cart.reduce((s, i) => s + i.price, 0);
+      db.ref('orders').push({
+        customerName: name,
+        customerPhone: phone,
+        mapLocation: { googleMapsUrl: `https://www.google.com/maps?q=${selectedLat},${selectedLng}` },
+        items: cart,
+        totalPrice: total,
+        status: "Pending",
+        timestamp: new Date().toISOString()
+      }).then(() => {
+        alert("Oda yako imetumwa kikamilifu!");
+        cart = [];
+        document.getElementById('cart-count').textContent = 0;
+        document.getElementById('cart-total').textContent = 0;
+      });
+    }
+  </script>
+</body>
+</html>
