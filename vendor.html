@@ -18,11 +18,11 @@
 <body>
 
   <div style="display: flex; justify-content: space-between; align-items: center;">
-    <h1>🛠️️ Vendor & Admin Panel</h1>
+    <h1>🛠 Vendor & Admin Panel</h1>
     <button onclick="logout()" style="width: auto; background: #c62828; padding: 6px 12px;">Logout</button>
   </div>
   
-  <div id="auth-status" style="color: red; font-weight: bold; margin: 10px 0;">Inahakiki mamlaka ya Admin...</div>
+  <div id="auth-status" style="color: green; font-weight: bold; margin: 10px 0;">Inahakiki mamlaka ya Admin...</div>
 
   <div class="container" id="admin-content" style="display: none;">
     <!-- Inventory Panel -->
@@ -49,7 +49,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <script>
-  const firebaseConfig = {
+    const firebaseConfig = {
   apiKey: "AIzaSyBlsEfZZg3N6P40yzDZVzT90xwK-zImd88",
   authDomain: "foodies-mbeya.firebaseapp.com",
   databaseURL: "https://foodies-mbeya-default-rtdb.firebaseio.com",
@@ -66,22 +66,28 @@
     const db = firebase.database();
     const auth = firebase.auth();
 
+    const ADMIN_EMAIL = "soko@on.mby";
+
     function logout() {
       auth.signOut().then(() => { window.location.replace("index.html"); });
     }
 
-    // VERIFY ADMIN STATUS
+    // VERIFY ADMIN DIRECTLY VIA EMAIL
     auth.onAuthStateChanged(user => {
       if (user) {
-        db.ref('admins/' + user.uid).once('value', snapshot => {
-          if (snapshot.exists()) {
-            document.getElementById('auth-status').style.display = 'none';
-            document.getElementById('admin-content').style.display = 'flex';
-            initVendorPanel();
-          } else {
-            document.getElementById('auth-status').textContent = "Huna Mamlaka! Akaunti hii sio ya Admin.";
-          }
-        });
+        if (user.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+          // Kama ni soko@on.mby -> Mpe Mamlaka Papo Hapo
+          document.getElementById('auth-status').style.display = 'none';
+          document.getElementById('admin-content').style.display = 'flex';
+          initVendorPanel();
+        } else {
+          // Kama sio soko@on.mby -> Mzuie na Mpeleke user.html
+          document.getElementById('auth-status').style.color = 'red';
+          document.getElementById('auth-status').textContent = "Huna Mamlaka! Akaunti hii sio ya Admin.";
+          setTimeout(() => {
+            window.location.replace("user.html");
+          }, 2000);
+        }
       } else {
         window.location.replace("index.html");
       }
@@ -91,42 +97,50 @@
       window.addProduct = function() {
         const name = document.getElementById('p-name').value;
         const price = document.getElementById('p-price').value;
-        if (!name || !price) return alert("Jaza vyote!");
+        if (!name || !price) return alert("Jaza jina na bei ya bidhaa!");
 
-        db.ref('products').push({ name, price: parseInt(price) }).then(() => {
+        db.ref('products').push({ 
+          name: name, 
+          price: parseInt(price) 
+        }).then(() => {
           document.getElementById('p-name').value = '';
           document.getElementById('p-price').value = '';
-        });
+          alert("Bidhaa imehifadhiwa kikamilifu!");
+        }).catch(err => alert("Kosa: " + err.message));
       };
 
+      // Read Products Live
       db.ref('products').on('value', snapshot => {
         const list = document.getElementById('products-list');
         list.innerHTML = '';
         const data = snapshot.val();
+        if (!data) return list.innerHTML = '<p>Hakuna bidhaa zilizowekwa bado.</p>';
+
         for (let id in data) {
           list.innerHTML += `
-            <div style="display:flex; justify-content:space-between; margin:5px 0;">
-              <span>${data[id].name} - TZS ${parseInt(data[id].price).toLocaleString()}</span>
-              <button style="width:auto; background:red; padding:2px 6px;" onclick="db.ref('products/${id}').remove()">Futa</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin:8px 0; background:#f9f9f9; padding:8px; border-radius:4px;">
+              <span><strong>${data[id].name}</strong> - TZS ${parseInt(data[id].price).toLocaleString()}</span>
+              <button style="width:auto; background:#c62828; padding:4px 8px; font-size:12px;" onclick="db.ref('products/${id}').remove()">Futa</button>
             </div>
           `;
         }
       });
 
+      // Read Orders Live
       db.ref('orders').on('value', snapshot => {
         const list = document.getElementById('orders-list');
         list.innerHTML = '';
         const orders = snapshot.val();
-        if (!orders) return list.innerHTML = '<p>Hakuna oda kwa sasa.</p>';
+        if (!orders) return list.innerHTML = '<p>Hakuna oda mpya kwa sasa.</p>';
 
         for (let id in orders) {
           const o = orders[id];
           const url = o.mapLocation ? o.mapLocation.googleMapsUrl : '#';
           list.innerHTML += `
             <div class="order-card">
-              <strong>Mteja:</strong> ${o.customerName} (${o.customerPhone})<br>
-              <strong>Jumla:</strong> TZS ${parseInt(o.totalPrice).toLocaleString()}<br>
-              <a href="${url}" target="_blank" style="color:#0288d1; font-weight:bold;">📍 Fungua Eneo Google Maps</a>
+              <strong>Mteja:</strong> ${o.customerName || 'Mteja'} (${o.customerPhone || 'Haina Simu'})<br>
+              <strong>Jumla:</strong> TZS ${parseInt(o.totalPrice || 0).toLocaleString()}<br>
+              <a href="${url}" target="_blank" style="color:#0288d1; font-weight:bold; display:inline-block; margin-top:5px;">📍 Fungua Eneo Google Maps</a>
             </div>
           `;
         }
