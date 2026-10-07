@@ -22,7 +22,6 @@
     .status-Delivered { background: #2e7d32; }
     .status-Cancelled { background: #c62828; }
 
-    /* Cart Editor Styling */
     .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #f9f9f9; border-radius: 6px; margin-bottom: 6px; border: 1px solid #eee; }
     .qty-btn { background: #0288d1; color: white; padding: 2px 8px; border-radius: 3px; font-size: 14px; margin: 0 4px; border: none; cursor: pointer; }
     .del-btn { background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px; border: none; cursor: pointer; margin-left: 6px; }
@@ -56,10 +55,7 @@
 
   <div class="cart">
     <h2>Kikapu Chako (<span id="cart-count">0</span>)</h2>
-    
-    <!-- Edit Cart Area -->
     <div id="cart-items"></div>
-    
     <p style="font-size: 18px; margin-top: 15px;"><strong>Jumla Kuu: TZS <span id="cart-total">0</span></strong></p>
     
     <hr>
@@ -79,6 +75,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 
   <script>
     const firebaseConfig = {
@@ -95,6 +92,7 @@
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const auth = firebase.auth();
+    const messaging = firebase.messaging();
 
     let currentUser = null;
 
@@ -103,12 +101,28 @@
       else {
         currentUser = user;
         loadUserOrders();
+        setupNotifications();
       }
     });
 
     function logout() {
       auth.signOut().then(() => window.location.replace("index.html"));
     }
+
+    // ENABLE FCM NOTIFICATIONS
+    function setupNotifications() {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          messaging.getToken().then(token => {
+            if (token) db.ref('users/' + currentUser.uid + '/fcmToken').set(token);
+          });
+        }
+      });
+    }
+
+    messaging.onMessage(payload => {
+      alert(`🔔 ${payload.notification.title}\n${payload.notification.body}`);
+    });
 
     // MAPBOX SETTINGS & BOUNDS FOR MBEYA
     const mapboxAccessToken = 'pk.eyJ1IjoiZmluY2hsZW9uYXJkIiwiYSI6ImNtdXNqbWpybzBsdWkyeHNkbjI4ZWZpN2gifQ.elQjZtJsfEglZTipbJRBNA';
@@ -173,6 +187,8 @@
       }
     }
 
+    let previousStatuses = {};
+
     function loadUserOrders() {
       db.ref('orders').on('value', snapshot => {
         const list = document.getElementById('user-orders-list');
@@ -185,6 +201,18 @@
             myOrdersCount++;
             const o = orders[id];
             const status = o.status || 'Pending';
+
+            // SOUND & POPUP WHEN STATUS CHANGES
+            if (previousStatuses[id] && previousStatuses[id] !== status) {
+              if (Notification.permission === 'granted') {
+                new Notification("📦 Hali ya Oda Imebadilika!", {
+                  body: `Oda yako ya TZS ${o.totalPrice.toLocaleString()} sasa ni: ${status}`,
+                  icon: 'https://cdn-icons-png.flaticon.com/512/3081/3081559.png'
+                });
+              }
+            }
+            previousStatuses[id] = status;
+
             list.innerHTML += `
               <div style="background:#f9f9f9; padding:8px; border-radius:4px; margin-bottom:6px; border-left:4px solid #2e7d32;">
                 <div style="display:flex; justify-content:space-between;">
@@ -201,7 +229,6 @@
       });
     }
 
-    // READ PRODUCTS
     db.ref('products').on('value', snapshot => {
       const list = document.getElementById('products-list');
       list.innerHTML = '';
@@ -224,7 +251,6 @@
       }
     });
 
-    // ADD TO CART WITH QUANTITY
     function addToCart(name, unitPrice) {
       const existing = cart.find(i => i.name === name);
       if (existing) {
@@ -246,12 +272,9 @@
       renderCart();
     }
 
-    // CART EDITING FUNCTIONS
     window.changeQty = function(index, delta) {
       cart[index].qty += delta;
-      if (cart[index].qty <= 0) {
-        cart.splice(index, 1);
-      }
+      if (cart[index].qty <= 0) cart.splice(index, 1);
       renderCart();
     };
 
