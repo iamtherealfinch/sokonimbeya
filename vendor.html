@@ -13,7 +13,6 @@
     input, button, select { width: 100%; padding: 10px; margin: 6px 0; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; }
     button { background: #1b5e20; color: white; border: none; font-weight: bold; cursor: pointer; }
     
-    /* Dashboard Cards */
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px; }
     .stat-card { background: #fff; padding: 12px; border-radius: 8px; border-left: 4px solid #2e7d32; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .stat-card h4 { margin: 0; font-size: 12px; color: #666; }
@@ -32,7 +31,10 @@
 
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
     <h1>🛠️ Admin Panel & Analytics</h1>
-    <button onclick="logout()" style="width: auto; background: #c62828; padding: 6px 12px;">Logout</button>
+    <div>
+      <button onclick="enableNotifications()" style="width: auto; background: #0288d1; padding: 6px 12px; font-size:12px;">🔔 Ruhusu Notification</button>
+      <button onclick="logout()" style="width: auto; background: #c62828; padding: 6px 12px; font-size:12px;">Logout</button>
+    </div>
   </div>
   
   <div id="auth-status" style="color: green; font-weight: bold; margin: 10px 0;">Inahakiki mamlaka...</div>
@@ -42,15 +44,15 @@
     <!-- DASHBOARD ANALYTICS -->
     <div class="stats-grid">
       <div class="stat-card">
-        <h4>JUMLA YA MAPATO (SALES)</h4>
+        <h4>JUMLA YA MAPATO</h4>
         <p id="total-revenue">TZS 0</p>
       </div>
       <div class="stat-card" style="border-color: #c62828;">
-        <h4>MATUMIZI (EXPENSES)</h4>
+        <h4>MATUMIZI</h4>
         <p id="total-expenses" style="color: #c62828;">TZS 0</p>
       </div>
       <div class="stat-card" style="border-color: #0288d1;">
-        <h4>FAIDA SAFI (NET PROFIT)</h4>
+        <h4>FAIDA SAFI</h4>
         <p id="net-profit" style="color: #0288d1;">TZS 0</p>
       </div>
       <div class="stat-card" style="border-color: #e65100;">
@@ -72,7 +74,7 @@
 
         <hr>
         <h3>2. Rekodi Matumizi (Expense)</h3>
-        <input type="text" id="exp-desc" placeholder="Maelezo ya Matumizi (Mfano: Nauli, Bando)">
+        <input type="text" id="exp-desc" placeholder="Maelezo ya Matumizi">
         <input type="number" id="exp-amount" placeholder="Kiasi (TZS)">
         <button style="background: #e65100;" onclick="addExpense()">Hifadhi Matumizi</button>
 
@@ -98,6 +100,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 
   <script>
     const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/emakljnw/image/upload";
@@ -117,18 +120,43 @@
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const auth = firebase.auth();
+    const messaging = firebase.messaging();
 
     const ADMIN_EMAIL = "soko@on.mby";
+    const alertSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 
     function logout() {
       auth.signOut().then(() => window.location.replace("index.html"));
     }
+
+    // 1. ENABLE NOTIFICATIONS (FCM + BROWSER PERMISSION)
+    function enableNotifications() {
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          messaging.getToken().then((token) => {
+            if (token) {
+              db.ref('vendors/admin/fcmToken').set(token);
+              alert("🔔 Notifications zimeruhusiwa kikamilifu!");
+            }
+          }).catch(err => console.log("FCM Token Error:", err));
+        } else {
+          alert("Umekataa ruhusa ya notification!");
+        }
+      });
+    }
+
+    // FOREGROUND MESSAGING NOTIFICATION
+    messaging.onMessage((payload) => {
+      alertSound.play();
+      alert(`🔔 ${payload.notification.title}\n${payload.notification.body}`);
+    });
 
     auth.onAuthStateChanged(user => {
       if (user && user.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
         document.getElementById('auth-status').style.display = 'none';
         document.getElementById('admin-content').style.display = 'flex';
         initVendorPanel();
+        enableNotifications();
       } else {
         document.getElementById('auth-status').style.color = 'red';
         document.getElementById('auth-status').textContent = "Huna Mamlaka!";
@@ -138,9 +166,25 @@
 
     let globalRevenue = 0;
     let globalExpenses = 0;
+    let initialLoad = true;
 
     function initVendorPanel() {
-      // 1. ADD PRODUCT TO CLOUDINARY & FIREBASE
+      // SOUND ALERT FOR NEW INCOMING ORDERS (REALTIME)
+      db.ref('orders').on('child_added', snapshot => {
+        if (!initialLoad) {
+          const order = snapshot.val();
+          if (order && order.status === 'Pending') {
+            alertSound.play().catch(e => console.log("Audio play blocked:", e));
+            if (Notification.permission === 'granted') {
+              new Notification("🛒 Oda Mpya Inaingia!", {
+                body: `Mteja ${order.customerName || 'Mteja'} ametuma oda ya TZS ${parseInt(order.totalPrice || 0).toLocaleString()}`,
+                icon: 'https://cdn-icons-png.flaticon.com/512/3081/3081559.png'
+              });
+            }
+          }
+        }
+      });
+
       window.addProduct = async function() {
         const name = document.getElementById('p-name').value.trim();
         const price = document.getElementById('p-price').value;
@@ -185,7 +229,6 @@
         });
       };
 
-      // 2. ADD EXPENSE
       window.addExpense = function() {
         const desc = document.getElementById('exp-desc').value.trim();
         const amount = document.getElementById('exp-amount').value;
@@ -202,7 +245,6 @@
         });
       };
 
-      // 3. READ PRODUCTS
       db.ref('products').on('value', snapshot => {
         const list = document.getElementById('products-list');
         list.innerHTML = '';
@@ -242,7 +284,6 @@
         });
       };
 
-      // 4. READ EXPENSES FOR ANALYTICS
       db.ref('expenses').on('value', snapshot => {
         globalExpenses = 0;
         const data = snapshot.val();
@@ -250,7 +291,6 @@
         updateAnalytics();
       });
 
-      // 5. READ ORDERS (LIVE & HISTORY)
       db.ref('orders').on('value', snapshot => {
         const list = document.getElementById('orders-list');
         const historyList = document.getElementById('orders-history');
@@ -265,6 +305,7 @@
           list.innerHTML = '<p>Hakuna oda mpya.</p>';
           historyList.innerHTML = '<p>Hakuna history ya oda.</p>';
           updateAnalytics();
+          initialLoad = false;
           return;
         }
 
@@ -313,6 +354,7 @@
 
         document.getElementById('pending-count').textContent = pendingCount;
         updateAnalytics();
+        initialLoad = false;
       });
 
       window.updateOrderStatus = function(orderId, newStatus) {
